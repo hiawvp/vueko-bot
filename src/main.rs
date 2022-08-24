@@ -48,7 +48,6 @@ impl EventHandler for Handler {
         for guild in guilds {
             println!("Guild id: {:?}", guild);
         }
-
         //let guilds = context.cache.read().guilds.len();
 
         //println!("Guilds in the Cache: {}", guilds);
@@ -60,7 +59,7 @@ impl EventHandler for Handler {
 }
 
 #[group]
-#[commands(ping, help, meme, square, react)]
+#[commands(ping, help, meme, square, react, emojix)]
 struct General;
 
 #[tokio::main]
