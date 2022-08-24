@@ -7,21 +7,21 @@ use serenity::prelude::*;
 use std::collections::HashMap;
 use tracing::log::info;
 
-#[derive(Hash, Eq, PartialEq, Debug)]
-struct EmojiMap {
-    name: String,
-    id: u64,
-}
+//#[derive(Hash, Eq, PartialEq, Debug)]
+//struct EmojiMap {
+//name: String,
+//id: u64,
+//}
 
-impl EmojiMap {
-    /// Creates a new Viking.
-    fn new(name: &str, id: &u64) -> EmojiMap {
-        EmojiMap {
-            name: name.to_string(),
-            id: id.clone(),
-        }
-    }
-}
+//impl EmojiMap {
+///// Creates a new Viking.
+//fn new(name: &str, id: &u64) -> EmojiMap {
+//EmojiMap {
+//name: name.to_string(),
+//id: id.clone(),
+//}
+//}
+//}
 
 #[derive(Serialize, Deserialize)]
 struct RedditResponse {
@@ -150,14 +150,13 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
         Some(v) => v,
         None => &response,
     };
-    println!("url: {:#?}", first);
     match serde_json::from_value(first.clone()) {
         Ok::<RedditResponse, _>(r) => {
-            println!("success! kind:  {}", r.kind);
+            info!("fetch reddit post ok");
             Ok(r.data.children[0].data.clone())
         }
         Err(e) => {
-            println!("Error! {}", e);
+            info!("Error! {}", e);
             Err(Box::new(e))
         }
     }
@@ -168,6 +167,7 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
 }
 
 #[command]
+#[description("get them good memes")]
 pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let response: String;
     if let Ok(res) = fetch_reddit_post().await {
