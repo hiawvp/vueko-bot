@@ -6,7 +6,10 @@ use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
 use serenity::prelude::*;
 use std::collections::HashMap;
+use std::time::Duration;
 use tracing::log::info;
+
+use crate::ReactionTypeContainer;
 
 //#[derive(Hash, Eq, PartialEq, Debug)]
 //struct EmojiMap {
@@ -23,6 +26,11 @@ use tracing::log::info;
 //}
 //}
 //}
+
+const BOT_ID: u64 = 1010296921274974379;
+const HALAL_MSG: &str = "SI TE GUSTO EL MEME SUSCRIBETE";
+const HARAM_MSG: &str = "NO TE GUSTO EL MEME AHHH?";
+const HARAM_MSG_P2: &str = "AKI TE VA OTRO\n https://media.discordapp.net/attachments/1010298574241800302/1012487429829169282/FZkBXMiXkAAQLxm.jpeg.jpg?width=556&height=685 ";
 
 #[derive(Serialize, Deserialize)]
 struct RedditResponse {
@@ -154,7 +162,7 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
     ];
     let subr = options.choose(&mut rand::thread_rng()).unwrap();
     let url = format!("https://www.reddit.com/r/{}/random.json", subr);
-    println!("url: {:#?}", url);
+    info!("url: {:#?}", url);
     let response: serde_json::Value = reqwest::get(url).await?.json().await?;
     let first = match response.get(0) {
         Some(v) => v,
@@ -174,7 +182,8 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
 
 #[command]
 #[description("get them good memes")]
-pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+//pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+pub async fn meme(ctx: &Context, msg: &Message) -> CommandResult {
     let response: String;
     if let Ok(res) = fetch_reddit_post().await {
         response = res.content();
@@ -199,4 +208,77 @@ pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
     //}
     //join!(reply.react(ctx, halal), reply.react(ctx, haram));
     Ok(())
+}
+
+pub async fn handle_meme_reactions(ctx: &Context, msg: &Message) {
+    info!("HANDLE MEME REACTIONS");
+    let _ = tokio::time::sleep(Duration::from_secs(10)).await;
+    let messages = match msg
+        .channel_id
+        .messages(&ctx.http, |retriever| retriever.after(msg.id).limit(5))
+        .await
+    {
+        Ok(messages) => messages,
+        Err(_) => return,
+    };
+
+    let reply = match messages.iter().find(|message| {
+        message.author.id == BOT_ID
+            && message.referenced_message.is_some()
+            && message.referenced_message.as_ref().unwrap().id == msg.id
+    }) {
+        Some(message) => message,
+        None => return,
+    };
+
+    let (haram, halal) = {
+        let data_read = ctx.data.read().await;
+        let reactions_lock = data_read
+            .get::<ReactionTypeContainer>()
+            .expect("expected reactiontypes in mappu")
+            .clone();
+
+        let stored_reactions = reactions_lock.read().await;
+        (
+            stored_reactions.get("haram").unwrap().clone(),
+            stored_reactions.get("halal").unwrap().clone(),
+        )
+    };
+    let positive_response = format!("{} {}", HALAL_MSG, halal);
+    let negative_response = format!("{} {}\n{}", HARAM_MSG, haram, HARAM_MSG_P2);
+    reply_to_reactions(ctx, reply, halal, &positive_response).await;
+    reply_to_reactions(ctx, reply, haram, &negative_response).await;
+}
+
+async fn reply_to_reactions(
+    ctx: &Context,
+    meme_msg: &Message,
+    emoji: ReactionType,
+    response: &str,
+) {
+    let reactionsxd = ctx
+        .http
+        .get_reaction_users(
+            meme_msg.channel_id.into(),
+            meme_msg.id.into(),
+            &emoji,
+            10,
+            None,
+        )
+        .await;
+
+    match reactionsxd {
+        Ok(users) => {
+            for user in users {
+                if user.id == BOT_ID {
+                    continue;
+                }
+                info!("dming user with tag: {}", user.tag());
+                let _ = user
+                    .direct_message(&ctx.http, |m| m.content(response))
+                    .await;
+            }
+        }
+        Err(e) => info!("error! {}", e),
+    };
 }

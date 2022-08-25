@@ -13,7 +13,6 @@ mod commands;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::env;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -40,18 +39,22 @@ use tracing::{error, info};
 use crate::commands::meme::*;
 use crate::commands::meta::CommandCounter;
 use crate::commands::meta::*;
-//use crate::commands::owner::*;
-//
 
-//struct CommandCounter;
+pub struct ShardManagerContainer;
 
-//impl TypeMapKey for CommandCounter {
-//type Value = Arc<RwLock<HashMap<String, u64>>>;
-//}
+impl TypeMapKey for ShardManagerContainer {
+    type Value = Arc<Mutex<ShardManager>>;
+}
+
+pub struct ReactionTypeContainer;
+
+impl TypeMapKey for ReactionTypeContainer {
+    type Value = Arc<RwLock<HashMap<String, ReactionType>>>;
+}
 
 #[hook]
 async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
-    println!(
+    info!(
         "Running command '{}' invoked by '{}'",
         command_name,
         msg.author.tag()
@@ -90,68 +93,15 @@ async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
 async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result: CommandResult) {
     match command_result {
         Ok(()) => {
-            println!("Processed command '{}'", command_name);
+            info!("Processed command '{}'", command_name);
             match command_name {
                 "meme" => {
-                    //let channel = match ctx.cache.guild_channel(msg.channel_id).await{
-                    //Some(channel) => channel,
-                    //None => return,
-                    //};
-
-                    println!("meme call id {} ", msg.id);
-                    let _ = tokio::time::sleep(Duration::from_secs(10)).await;
-                    let messages = match msg
-                        .channel_id
-                        .messages(&ctx.http, |retriever| retriever.after(msg.id).limit(5))
-                        .await
-                    {
-                        Ok(messages) => messages,
-                        Err(_) => return,
-                    };
-
-                    let reply = match messages.iter().find(|message| {
-                        message.author.id == 1010296921274974379
-                            && message.referenced_message.is_some()
-                            && message.referenced_message.as_ref().unwrap().id == msg.id
-                    }) {
-                        Some(message) => message,
-                        None => return,
-                    };
-                    println!(
-                        "meme  {}  got {} reactions",
-                        reply.id,
-                        reply.reactions.len()
-                    );
-
-                    let reactionsxd = ctx
-                        .http
-                        .get_reaction_users(
-                            reply.channel_id.into(),
-                            reply.id.into(),
-                            &ReactionType::Custom {
-                                animated: false,
-                                id: EmojiId(953465443312623706),
-                                name: Some("haram".to_string()),
-                            },
-                            10,
-                            None,
-                        )
-                        .await;
-
-                    match reactionsxd {
-                        Ok(users) => {
-                            for user in users {
-                                println!("user tag: {}", user.tag());
-                                let _ = user.direct_message(&ctx.http, |m| m.content("lol")).await;
-                            }
-                        }
-                        Err(e) => println!("error! {}", e),
-                    };
+                    let _ = handle_meme_reactions(ctx, msg).await;
                 }
                 _ => {}
             }
         }
-        Err(why) => println!("Command '{}' returned error {:?}", command_name, why),
+        Err(why) => info!("Command '{}' returned error {:?}", command_name, why),
     }
 }
 
@@ -160,12 +110,48 @@ async fn unknown_command(_ctx: &Context, _msg: &Message, unknown_command_name: &
     info!("Could not find command named '{}'", unknown_command_name);
 }
 
-pub struct ShardManagerContainer;
+async fn init_emojis(ctx: &Context) {
+    let emoji_lock = {
+        let data_read = ctx.data.read().await;
+        data_read
+            .get::<ReactionTypeContainer>()
+            .expect("Expected ReactionTypeContainer in TypeMap.")
+            .clone()
+    };
+    {
+        let mut emojis = emoji_lock.write().await;
+        let emoji_name = "haram".to_string();
+        let _entry = emojis.insert(
+            emoji_name.clone(),
+            ReactionType::Custom {
+                animated: false,
+                id: EmojiId(953465443312623706),
+                name: Some(emoji_name.clone()),
+            },
+        );
 
-impl TypeMapKey for ShardManagerContainer {
-    type Value = Arc<Mutex<ShardManager>>;
+        let emoji_name = "halal".to_string();
+        let _entry = emojis.insert(
+            emoji_name.clone(),
+            ReactionType::Custom {
+                animated: false,
+                id: EmojiId(953465392607690752),
+                name: Some(emoji_name.clone()),
+            },
+        );
+        //match entry {
+        //Some(v) => match v {
+        //ReactionType::Custom {
+        //animated: _,
+        //id,
+        //name: _,
+        //} => info!("inserted: {}", id),
+        //_ => info!("cualquier wea xd"),
+        //},
+        //None => info!("could not insert umu"),
+        //}
+    }
 }
-
 struct Handler;
 
 #[async_trait]
@@ -173,14 +159,12 @@ impl EventHandler for Handler {
     async fn ready(&self, context: Context, ready: Ready) {
         info!("Connected as {}", ready.user.name);
         thread::sleep(Duration::from_secs(5));
-        println!("{} number of guilds", context.cache.guilds().len());
+        info!("{} number of guilds", context.cache.guilds().len());
         let guilds = context.cache.guilds();
         for guild in guilds {
-            println!("Guild id: {:?}", guild);
+            info!("Guild id: {:?}", guild);
         }
-        //let guilds = context.cache.read().guilds.len();
-
-        //println!("Guilds in the Cache: {}", guilds);
+        init_emojis(&context).await;
     }
 
     async fn resume(&self, _: Context, _: ResumedEvent) {
@@ -297,6 +281,7 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<ShardManagerContainer>(client.shard_manager.clone());
         data.insert::<CommandCounter>(Arc::new(RwLock::new(HashMap::default())));
+        data.insert::<ReactionTypeContainer>(Arc::new(RwLock::new(HashMap::default())));
     }
 
     let shard_manager = client.shard_manager.clone();
