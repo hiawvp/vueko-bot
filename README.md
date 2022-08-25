@@ -1,6 +1,6 @@
-# vueko-bot
+# vueko-bot (WIP)
 
-sfw version of kaos-bot written in rust (WIP)
+SFW version of kaos-bot written in rust for learning purposes
 
 # Resources
 
@@ -12,6 +12,10 @@ sfw version of kaos-bot written in rust (WIP)
 
 - $help
 - $meme
-- daily messages
+  - store favourites through reactions
+  - add more sources
 - $tasks
+- daily messages
+- update commands settings for a server via commands
+
 and more
