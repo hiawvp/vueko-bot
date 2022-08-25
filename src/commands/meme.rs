@@ -1,3 +1,4 @@
+//use futures::join;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use serenity::framework::standard::macros::command;
@@ -50,6 +51,13 @@ struct ChildrenData {
     //subreddit: String,
     title: String,
     url: Option<String>,
+}
+
+impl ChildrenData {
+    fn content(&self) -> String {
+        let url = self.url.clone().unwrap_or(String::from(""));
+        format!("**{}**\n {}", self.title, url)
+    }
 }
 
 #[command]
@@ -108,6 +116,7 @@ async fn get_emoji_by_name(ctx: &Context, msg: &Message, name: &str) -> Option<E
     None
 }
 
+// TODO: store emojis in ctx.data
 async fn get_emoji(ctx: &Context, name: &str) -> Option<ReactionType> {
     info!("get emoji!");
     //let guild_id: u64 = 955133006627082240;
@@ -133,6 +142,7 @@ async fn get_emoji(ctx: &Context, name: &str) -> Option<ReactionType> {
     }
 }
 
+// TODO: store options in ctx.data
 async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>> {
     let options = vec![
         "okbuddybaka",
@@ -160,10 +170,6 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
             Err(Box::new(e))
         }
     }
-
-    //info!("response from str?");
-    //info!("{}", p.data.children[0].data.url.clone());
-    //Ok(p.data.children[0].data.url.clone())
 }
 
 #[command]
@@ -171,14 +177,13 @@ async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>
 pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     let response: String;
     if let Ok(res) = fetch_reddit_post().await {
-        let url = res.url.unwrap_or(String::from("no url tho :()"));
-        info!("request ok! {}", url);
-        response = format!("**{}**\n {}", res.title, url);
+        response = res.content();
+        info!("request ok! content:  {}", response);
     } else {
         response = String::from(":TrollFace:");
     }
 
-    let reply = msg.channel_id.say(&ctx.http, response).await?;
+    let reply = msg.reply(&ctx.http, response).await?;
     let halal: ReactionType = get_emoji(&ctx, "halal")
         .await
         .unwrap_or_else(|| '👌'.into());
@@ -187,5 +192,11 @@ pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult
         .unwrap_or_else(|| '👎'.into());
     reply.react(ctx, halal).await?;
     reply.react(ctx, haram).await?;
+    //reply.content\c
+
+    //if let Some(reaction) = &reply.await_reaction(&ctx).timeout(Duration::from_secs(10)).await{
+
+    //}
+    //join!(reply.react(ctx, halal), reply.react(ctx, haram));
     Ok(())
 }

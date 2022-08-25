@@ -15,6 +15,8 @@ use std::collections::HashSet;
 use std::env;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::thread;
+use std::time::Duration;
 
 use serenity::async_trait;
 use serenity::client::bridge::gateway::ShardManager;
@@ -28,10 +30,10 @@ use serenity::http::Http;
 use serenity::model::channel::Message;
 use serenity::model::event::ResumedEvent;
 use serenity::model::gateway::Ready;
+use serenity::model::prelude::EmojiId;
+use serenity::model::prelude::ReactionType;
 use serenity::model::prelude::UserId;
 use serenity::prelude::*;
-use std::thread;
-use std::time::Duration;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 
@@ -70,7 +72,6 @@ async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
             .expect("Expected CommandCounter in TypeMap.")
             .clone()
     };
-
     // Just like with client.data in main, we want to keep write locks open the least time
     // possible, so we wrap them on a block so they get automatically closed at the end.
     {
@@ -82,8 +83,76 @@ async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
         let entry = counter.entry(command_name.to_string()).or_insert(0);
         *entry += 1;
     }
-
     true
+}
+
+#[hook]
+async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result: CommandResult) {
+    match command_result {
+        Ok(()) => {
+            println!("Processed command '{}'", command_name);
+            match command_name {
+                "meme" => {
+                    //let channel = match ctx.cache.guild_channel(msg.channel_id).await{
+                    //Some(channel) => channel,
+                    //None => return,
+                    //};
+
+                    println!("meme call id {} ", msg.id);
+                    let _ = tokio::time::sleep(Duration::from_secs(10)).await;
+                    let messages = match msg
+                        .channel_id
+                        .messages(&ctx.http, |retriever| retriever.after(msg.id).limit(5))
+                        .await
+                    {
+                        Ok(messages) => messages,
+                        Err(_) => return,
+                    };
+
+                    let reply = match messages.iter().find(|message| {
+                        message.author.id == 1010296921274974379
+                            && message.referenced_message.is_some()
+                            && message.referenced_message.as_ref().unwrap().id == msg.id
+                    }) {
+                        Some(message) => message,
+                        None => return,
+                    };
+                    println!(
+                        "meme  {}  got {} reactions",
+                        reply.id,
+                        reply.reactions.len()
+                    );
+
+                    let reactionsxd = ctx
+                        .http
+                        .get_reaction_users(
+                            reply.channel_id.into(),
+                            reply.id.into(),
+                            &ReactionType::Custom {
+                                animated: false,
+                                id: EmojiId(953465443312623706),
+                                name: Some("haram".to_string()),
+                            },
+                            10,
+                            None,
+                        )
+                        .await;
+
+                    match reactionsxd {
+                        Ok(users) => {
+                            for user in users {
+                                println!("user tag: {}", user.tag());
+                                let _ = user.direct_message(&ctx.http, |m| m.content("lol")).await;
+                            }
+                        }
+                        Err(e) => println!("error! {}", e),
+                    };
+                }
+                _ => {}
+            }
+        }
+        Err(why) => println!("Command '{}' returned error {:?}", command_name, why),
+    }
 }
 
 #[hook]
@@ -207,6 +276,7 @@ async fn main() {
         .configure(|c| c.owners(owners).prefix("~"))
         .unrecognised_command(unknown_command)
         .before(before)
+        .after(after)
         .help(&MY_HELP)
         .group(&GENERAL_GROUP);
 
