@@ -9,6 +9,7 @@
 //! features = ["framework", "standard_framework"]
 //! ```
 mod commands;
+mod reddit;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -37,6 +38,7 @@ use tokio::sync::RwLock;
 use tracing::{error, info};
 
 use crate::commands::meme::*;
+use crate::commands::momo::*;
 use crate::commands::meta::CommandCounter;
 use crate::commands::meta::*;
 
@@ -97,6 +99,9 @@ async fn after(ctx: &Context, msg: &Message, command_name: &str, command_result:
             match command_name {
                 "meme" => {
                     let _ = handle_meme_reactions(ctx, msg).await;
+                }
+                "momo" => {
+                    let _ = delete_momo_reactions(ctx, msg).await;
                 }
                 _ => {}
             }
@@ -225,7 +230,7 @@ async fn my_help(
 }
 
 #[group]
-#[commands(ping, meme, square, react, emojix, command_usage)]
+#[commands(ping, meme, momo, square, react, emojix, command_usage)]
 struct General;
 
 #[tokio::main]

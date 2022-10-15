@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 dotenv = "0.15.0"
-serenity = "0.11.5"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1.36"
 tracing-subscriber = "0.3.15"
@@ -16,3 +15,20 @@ serde = { version = "1.0.100", features = ["derive"] }
 serde_json = "1.0"
 rand = "0.8.5"
 futures = "0.3.23"
+
+[dependencies.serenity]
+default-features = false
+features = [
+    "builder",
+    "cache",
+    "client",
+    "collector",
+    "framework",
+    "gateway",
+    "http",
+    "model",
+    "standard_framework",
+    "utils",
+    "rustls_backend",
+]
+version = "0.11.5"

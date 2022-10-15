@@ -1,6 +1,6 @@
 //use futures::join;
-use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
+use crate::reddit::post::fetch_reddit_post;
+use crate::ReactionTypeContainer;
 use serenity::framework::standard::macros::command;
 use serenity::framework::standard::{Args, CommandResult};
 use serenity::model::prelude::*;
@@ -9,64 +9,10 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tracing::log::info;
 
-use crate::ReactionTypeContainer;
-
-//#[derive(Hash, Eq, PartialEq, Debug)]
-//struct EmojiMap {
-//name: String,
-//id: u64,
-//}
-
-//impl EmojiMap {
-///// Creates a new Viking.
-//fn new(name: &str, id: &u64) -> EmojiMap {
-//EmojiMap {
-//name: name.to_string(),
-//id: id.clone(),
-//}
-//}
-//}
-
-const BOT_ID: u64 = 1010296921274974379;
+pub const BOT_ID: u64 = 1010296921274974379;
 const HALAL_MSG: &str = "SI TE GUSTO EL MEME SUSCRIBETE";
 const HARAM_MSG: &str = "NO TE GUSTO EL MEME AHHH?";
 const HARAM_MSG_P2: &str = "AKI TE VA OTRO\n https://media.discordapp.net/attachments/1010298574241800302/1012487429829169282/FZkBXMiXkAAQLxm.jpeg.jpg?width=556&height=685 ";
-
-#[derive(Serialize, Deserialize)]
-struct RedditResponse {
-    data: Data,
-    kind: String,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Data {
-    //after: Option<String>,
-    //dist: i32,
-    modhash: Option<String>,
-    //geo_filter: String,
-    children: Vec<Child>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct Child {
-    kind: String,
-    data: ChildrenData,
-    //data: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-struct ChildrenData {
-    //subreddit: String,
-    title: String,
-    url: Option<String>,
-}
-
-impl ChildrenData {
-    fn content(&self) -> String {
-        let url = self.url.clone().unwrap_or(String::from(""));
-        format!("**{}**\n {}", self.title, url)
-    }
-}
 
 #[command]
 pub async fn emojix(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
@@ -150,36 +96,6 @@ async fn get_emoji(ctx: &Context, name: &str) -> Option<ReactionType> {
     }
 }
 
-// TODO: store options in ctx.data
-async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>> {
-    let options = vec![
-        "okbuddybaka",
-        "okbuddyretard",
-        "okbuddyphd",
-        "yo_ctm",
-        "dankgentina",
-        "196",
-    ];
-    let subr = options.choose(&mut rand::thread_rng()).unwrap();
-    let url = format!("https://www.reddit.com/r/{}/random.json", subr);
-    info!("url: {:#?}", url);
-    let response: serde_json::Value = reqwest::get(url).await?.json().await?;
-    let first = match response.get(0) {
-        Some(v) => v,
-        None => &response,
-    };
-    match serde_json::from_value(first.clone()) {
-        Ok::<RedditResponse, _>(r) => {
-            info!("fetch reddit post ok");
-            Ok(r.data.children[0].data.clone())
-        }
-        Err(e) => {
-            info!("Error! {}", e);
-            Err(Box::new(e))
-        }
-    }
-}
-
 #[command]
 #[description("get them good memes")]
 //pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
@@ -209,6 +125,74 @@ pub async fn meme(ctx: &Context, msg: &Message) -> CommandResult {
     //join!(reply.react(ctx, halal), reply.react(ctx, haram));
     Ok(())
 }
+
+//#[command]
+//#[description("new version of meme")]
+////pub async fn meme(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+//pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
+    //let response: String;
+    //let prev = '⬅';
+    //let next = '➡';
+    //let mut meme_idx = 0;
+    //let mut vec = Vec::new();
+
+    //if let Ok(res) = fetch_reddit_post().await {
+        //response = res.content();
+        //info!("request ok! content:  {}", response);
+    //} else {
+        //response = String::from(":TrollFace:");
+    //}
+    //vec.push(response.clone());
+    //let mut reply = msg.reply(&ctx.http, response).await?;
+    //let halal: ReactionType = get_emoji(&ctx, "halal")
+        //.await
+        //.unwrap_or_else(|| '👌'.into());
+    //let haram: ReactionType = get_emoji(&ctx, "haram")
+        //.await
+        //.unwrap_or_else(|| '👎'.into());
+    ////reply.react(&ctx, '✅').await?;
+    //reply.react(ctx, prev).await?;
+    //reply.react(ctx, halal).await?;
+    //reply.react(ctx, haram).await?;
+    //reply.react(ctx, next).await?;
+
+    //let collector = &mut reply
+        //.await_reactions(ctx)
+        //.removed(true)
+        //.timeout(Duration::from_secs(60))
+        //.author_id(msg.author.id)
+        //.build();
+
+    ////let http = &ctx.http;
+    ////
+    //while let Some(reaction) = collector.next().await {
+        //let rct: String = reaction.as_inner_ref().clone().emoji.as_data().to_string();
+        //let response;
+        //info!("reaction received {}", rct);
+        //if rct == next.to_string() {
+            //if let Ok(res) = fetch_reddit_post().await {
+                //response = res.content();
+                ////response = res.url.unwrap();
+                //info!("request ok! content:  {}", response);
+            //} else {
+                //response = String::from(":TrollFace:");
+            //}
+            //vec.push(response.clone());
+            //meme_idx += 1;
+        //} else if rct == prev.to_string() && meme_idx > 0 {
+            //meme_idx -= 1;
+            //response = vec[meme_idx].clone();
+        //} else {
+            //response = String::from(":TrollFace:");
+        //}
+        //info!("meme_idx {}", meme_idx);
+        ////reply.suppress_embeds(ctx).await?;
+        //reply.edit(ctx, |m| m.content(response)).await?;
+    //}
+    //Ok(())
+//}
+
+
 
 pub async fn handle_meme_reactions(ctx: &Context, msg: &Message) {
     info!("HANDLE MEME REACTIONS");
