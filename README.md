@@ -1,6 +1,6 @@
 # vueko-bot (WIP)
 
-SFW version of kaos-bot written in rust for learning purposes
+MEME BOT written in rust for learning purposes
 
 # Resources
 
