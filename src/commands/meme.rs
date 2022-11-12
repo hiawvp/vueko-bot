@@ -45,6 +45,21 @@ pub async fn react(ctx: &Context, msg: &Message, mut args: Args) -> CommandResul
 }
 
 #[command]
+pub async fn leddit(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
+    info!("Leddit");
+    let subreddit = args.single::<String>()?;
+    info!("args received: {}", subreddit);
+    let author = &msg.author.name;
+    info!("command received from {:?}", author);
+    let one = args.single::<f64>()?;
+    let two = args.single::<f64>()?;
+    info!("args received: {},  {}", one, two);
+    let product = one * two;
+    msg.channel_id.say(&ctx.http, product).await?;
+    Ok(())
+}
+
+#[command]
 pub async fn square(ctx: &Context, msg: &Message, mut args: Args) -> CommandResult {
     info!("SQUARE");
     let val = args.single::<f64>()?;

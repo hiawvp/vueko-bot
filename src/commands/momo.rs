@@ -2,7 +2,7 @@ use std::time::Duration;
 use serenity::futures::stream::StreamExt;
 use serenity::prelude::*;
 use crate::commands::meme::BOT_ID;
-use crate::reddit::post::fetch_reddit_post;
+use crate::reddit::post::alt_reddit_post;
 
 use serenity::framework::standard::CommandResult;
 use serenity::{model::prelude::Message, framework::standard::macros::command};
@@ -13,28 +13,44 @@ const PREV : char = '⬅';
 const NEXT : char = '➡';
 const GOOD : char = '👌';
 const BAD  : char = '👎';
-const COLLECTOR_DURATION : u64 = 15;
+const COLLECTOR_DURATION : u64 = 60;
+
+
+
+//#[command]
+//#[description("new version of meme")]
+//pub async fn koko(ctx: &Context, msg: &Message) -> CommandResult {
+    //alt_reddit_post().await;
+    //Ok(())
+//}
+
 #[command]
 #[description("new version of meme")]
 pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
     let title: String;
     let url: String;
+    let thumbnail: String;
+    let subreddit: String;
     let mut meme_idx = 0;
     let mut vec = Vec::new();
 
-    if let Ok(res) = fetch_reddit_post().await {
-        (title, url) = res.unpack();
+    if let Ok(res) = alt_reddit_post().await {
+        (title, subreddit, thumbnail, url) = res.unpack();
         info!("request ok! content:  {} ", title);
     } else {
         title = String::from(":TrollFace:");
         url = String::from("");
+        thumbnail = String::from("");
+        subreddit = String::from("");
     }
 
     vec.push((title.clone(), url.clone()));
     let mut reply = msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
             e.title(title)
-                .image(url)
+                .url(url)
+                .field("subreddit:", subreddit, false)
+                .image(thumbnail)
         })
         .reference_message(msg)
     }).await?;
@@ -56,10 +72,12 @@ pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
         info!("reaction received {}", rct);
         let mut title = String::from(":TrollFace:");
         let mut url = String::from("");
+        let mut thumbnail = String::from("");
+        let mut subreddit = String::from("");
         let mut meme_change = false;
         if rct == NEXT.to_string() {
-            if let Ok(res) = fetch_reddit_post().await {
-                (title, url) = res.unpack();
+            if let Ok(res) = alt_reddit_post().await {
+                (title, subreddit, thumbnail, url) = res.unpack();
                 info!("request ok! content:  {} ", title);
                 vec.push((title.clone(), url.clone()));
                 meme_idx += 1;
@@ -77,7 +95,9 @@ pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
             reply.edit(&ctx.http, |m| {
                 m.embed(|e| {
                     e.title(title)
-                        .image(url)
+                        .url(url)
+                        .field("subreddit:", subreddit, false)
+                        .image(thumbnail)
                 })
             }).await?;
         }

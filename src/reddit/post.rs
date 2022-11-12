@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 //use serenity::model::prelude::Embed;
 use tracing::info;
 //use serenity::Embed;
+//
+use roux::Subreddit;
+
 
 #[derive(Serialize, Deserialize)]
 struct RedditResponse {
@@ -30,7 +33,11 @@ struct Child {
 pub struct ChildrenData {
     //subreddit: String,
     title: String,
+    subreddit: String,
+    thumbnail: Option<String>,
+    domain: String,
     url: Option<String>,
+    stickied: bool,
 }
 
 impl ChildrenData {
@@ -38,9 +45,16 @@ impl ChildrenData {
         let url = self.url.clone().unwrap_or(String::from(""));
         format!("**{}**\n {}", self.title, url)
     }
-    pub fn unpack(&self) -> (String, String){
+    // returns (title, subreddit, thumbnail, url)
+    pub fn unpack(&self) -> (String, String, String, String){
+    // returns (title, subreddit, thumbnail, url)
         let url = self.url.clone().unwrap_or(String::from(""));
-        (self.title.clone(), url)
+        let thumbnail = match self.domain.as_str(){
+            "v.redd.it" => self.thumbnail.clone().unwrap_or(String::from("")),
+            _ => url.clone(),
+        };
+        //let url = self.url.clone().unwrap_or(String::from(""));
+        (self.title.clone(), self.subreddit.clone(), thumbnail, url)
     }
     //pub fn embed(&self) -> Embed {
         //let url = self.url.clone().unwrap_or(String::from(""));
@@ -49,8 +63,7 @@ impl ChildrenData {
     //}
 }
 
-// TODO: store options in ctx.data
-pub async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>> {
+pub fn get_random_sr_name() -> &'static str{
     let options = vec![
         "okbuddybaka",
         "okbuddyretard",
@@ -59,7 +72,40 @@ pub async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Err
         "dankgentina",
         "196",
     ];
-    let subr = options.choose(&mut rand::thread_rng()).unwrap();
+    options.choose(&mut rand::thread_rng()).unwrap().clone()
+}
+
+pub async fn alt_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>{
+    let subr = get_random_sr_name();
+    let subreddit = Subreddit::new(subr);
+    let hot = subreddit.hot(25, None).await;
+    let hot_string = serde_json::to_string_pretty(&hot.unwrap()).unwrap();
+    match serde_json::from_str(&hot_string) {
+        Ok::<RedditResponse, _>(v) => {
+            let post : ChildrenData;
+            loop {
+                let selected_post = v.data.children.choose(&mut rand::thread_rng()).unwrap();
+                if selected_post.data.stickied {
+                    info!("FOUND STICKY!");
+                } else {
+                    info!("valid post");
+                    post = selected_post.data.clone();
+                    {break;}
+                }
+            }
+            println!("{}", post.content());
+            Ok(post.clone())
+        },
+        Err(e) => {
+            info!("ERROR! {}", e);
+            Err(Box::new(e))
+        }
+    }
+}
+
+// TODO: store options in ctx.data
+pub async fn fetch_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>> {
+    let subr = get_random_sr_name();
     let url = format!("https://www.reddit.com/r/{}/random.json", subr);
     info!("url: {:#?}", url);
     let response: serde_json::Value = reqwest::get(url).await?.json().await?;
