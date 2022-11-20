@@ -144,17 +144,6 @@ async fn init_emojis(ctx: &Context) {
                 name: Some(emoji_name.clone()),
             },
         );
-        //match entry {
-        //Some(v) => match v {
-        //ReactionType::Custom {
-        //animated: _,
-        //id,
-        //name: _,
-        //} => info!("inserted: {}", id),
-        //_ => info!("cualquier wea xd"),
-        //},
-        //None => info!("could not insert umu"),
-        //}
     }
 }
 struct Handler;
@@ -229,8 +218,9 @@ async fn my_help(
     Ok(())
 }
 
+// #[commands(ping, meme, momo, square, react, emojix, command_usage)]
 #[group]
-#[commands(ping, meme, momo, square, react, emojix, command_usage)]
+#[commands(ping, meme, momo, command_usage)]
 struct General;
 
 #[tokio::main]

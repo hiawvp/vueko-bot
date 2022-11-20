@@ -2,7 +2,7 @@ use std::time::Duration;
 use serenity::futures::stream::StreamExt;
 use serenity::prelude::*;
 use crate::commands::meme::BOT_ID;
-use crate::reddit::post::alt_reddit_post;
+use crate::reddit::post::{alt_reddit_post, sample_post};
 
 use serenity::framework::standard::CommandResult;
 use serenity::{model::prelude::Message, framework::standard::macros::command};
@@ -27,38 +27,25 @@ const COLLECTOR_DURATION : u64 = 60;
 #[command]
 #[description("new version of meme")]
 pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
-    let title: String;
-    let url: String;
-    let thumbnail: String;
-    let subreddit: String;
-    let mut meme_idx = 0;
-    let mut vec = Vec::new();
-
-    if let Ok(res) = alt_reddit_post().await {
-        (title, subreddit, thumbnail, url) = res.unpack();
-        info!("request ok! content:  {} ", title);
-    } else {
-        title = String::from(":TrollFace:");
-        url = String::from("");
-        thumbnail = String::from("");
-        subreddit = String::from("");
-    }
-
-    vec.push((title.clone(), url.clone()));
+    let mut post = sample_post();
+    if let Ok(new_post) = alt_reddit_post().await {
+        post = new_post;
+        info!("request ok! content:  {} ", post.title);
+    } 
     let mut reply = msg.channel_id.send_message(&ctx.http, |m| {
         m.embed(|e| {
-            e.title(title)
-                .url(url)
-                .field("subreddit:", subreddit, false)
-                .image(thumbnail)
+            e.title(&post.title)
+                .url(&post.url)
+                .field("subreddit:", &post.subreddit, false)
+                .image(&post.thumbnail)
         })
         .reference_message(msg)
     }).await?;
-    reply.react(ctx, PREV).await?;
-    reply.react(ctx, GOOD).await?;
-    reply.react(ctx, BAD).await?;
-    reply.react(ctx, NEXT).await?;
+    add_reactions(ctx, &reply).await?;
 
+    let mut vec = Vec::new();
+    vec.push(post.clone());
+    let mut meme_idx = 0;
     let collector = &mut reply
         .await_reactions(ctx)
         .removed(true)
@@ -66,45 +53,50 @@ pub async fn momo(ctx: &Context, msg: &Message) -> CommandResult {
         .author_id(msg.author.id)
         .build();
 
-
     while let Some(reaction) = collector.next().await {
         let rct: String = reaction.as_inner_ref().clone().emoji.as_data().to_string();
-        info!("reaction received {}", rct);
-        let mut title = String::from(":TrollFace:");
-        let mut url = String::from("");
-        let mut thumbnail = String::from("");
-        let mut subreddit = String::from("");
         let mut meme_change = false;
         if rct == NEXT.to_string() {
-            if let Ok(res) = alt_reddit_post().await {
-                (title, subreddit, thumbnail, url) = res.unpack();
-                info!("request ok! content:  {} ", title);
-                vec.push((title.clone(), url.clone()));
+            info!("NEXT POST");
+            if let Ok(new_post) = alt_reddit_post().await {
+                info!("request ok! content:  {} ", new_post.title);
+                vec.push(new_post);
                 meme_idx += 1;
                 meme_change = true;
             }
         } else if rct == PREV.to_string() && meme_idx > 0 {
+            info!("PREV POST");
             meme_idx -= 1;
             meme_change = true;
-            (title, url) = vec[meme_idx].clone();
-        } 
-        info!("meme_idx {}", meme_idx);
+        } else {
+            let namexd = reaction.as_inner_ref().user(&ctx.http).await?.name;
+            info!("Unknown reaction :( {}", namexd);
+            let _ = msg.channel_id.send_message(&ctx.http, |m| {m.content(format!("{} se la come doblada", namexd))}).await;
+        }
+        let post = vec.get(meme_idx).unwrap().clone();
+        info!("final post:  {}", post.title);
         //reply.suppress_embeds(ctx).await?;
         if meme_change{
-            info!("gonna edit embed with:  {} {} ", title, url);
             reply.edit(&ctx.http, |m| {
                 m.embed(|e| {
-                    e.title(title)
-                        .url(url)
-                        .field("subreddit:", subreddit, false)
-                        .image(thumbnail)
+                    e.title(post.title)
+                        .url(post.url)
+                        .field("subreddit:", post.subreddit, false)
+                        .image(post.thumbnail)
                 })
             }).await?;
         }
-    }
+    };
     Ok(())
 }
 
+pub async fn add_reactions(ctx: &Context, msg: &Message) -> CommandResult{
+    msg.react(ctx, PREV).await?;
+    msg.react(ctx, GOOD).await?;
+    msg.react(ctx, BAD).await?;
+    msg.react(ctx, NEXT).await?;
+    Ok(())
+}
 
 pub async fn delete_momo_reactions(ctx: &Context, msg: &Message) {
     info!("HANDLE MoMo REACTIONS");

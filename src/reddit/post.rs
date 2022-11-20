@@ -32,12 +32,29 @@ struct Child {
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ChildrenData {
     //subreddit: String,
-    title: String,
-    subreddit: String,
-    thumbnail: Option<String>,
+    pub title: String,
+    pub subreddit: String,
+    pub thumbnail: Option<String>,
+    pub url: Option<String>,
     domain: String,
-    url: Option<String>,
     stickied: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct MemePost {
+    pub title: String,
+    pub subreddit: String,
+    pub thumbnail: String,
+    pub url: String,
+}
+
+pub fn sample_post() -> MemePost{
+    MemePost{
+        title : String::from(":TrollFace:"),
+        url : String::from(""),
+        thumbnail :String::from(""),
+        subreddit : String::from(""),
+    } 
 }
 
 impl ChildrenData {
@@ -45,22 +62,14 @@ impl ChildrenData {
         let url = self.url.clone().unwrap_or(String::from(""));
         format!("**{}**\n {}", self.title, url)
     }
-    // returns (title, subreddit, thumbnail, url)
-    pub fn unpack(&self) -> (String, String, String, String){
-    // returns (title, subreddit, thumbnail, url)
+    pub fn to_meme(&self) -> MemePost{
         let url = self.url.clone().unwrap_or(String::from(""));
         let thumbnail = match self.domain.as_str(){
             "v.redd.it" => self.thumbnail.clone().unwrap_or(String::from("")),
             _ => url.clone(),
         };
-        //let url = self.url.clone().unwrap_or(String::from(""));
-        (self.title.clone(), self.subreddit.clone(), thumbnail, url)
+        MemePost { title: self.title.clone(), subreddit: self.subreddit.clone(), thumbnail, url}
     }
-    //pub fn embed(&self) -> Embed {
-        //let url = self.url.clone().unwrap_or(String::from(""));
-        //Embed::{title: url}
-        ////format!("**{}**\n {}", self.title, url)
-    //}
 }
 
 pub fn get_random_sr_name() -> &'static str{
@@ -71,11 +80,12 @@ pub fn get_random_sr_name() -> &'static str{
         "yo_ctm",
         "dankgentina",
         "196",
+        "2hujerk",
     ];
     options.choose(&mut rand::thread_rng()).unwrap().clone()
 }
 
-pub async fn alt_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error>>{
+pub async fn alt_reddit_post() -> Result<MemePost, Box<dyn std::error::Error>>{
     let subr = get_random_sr_name();
     let subreddit = Subreddit::new(subr);
     let hot = subreddit.hot(25, None).await;
@@ -94,7 +104,7 @@ pub async fn alt_reddit_post() -> Result<ChildrenData, Box<dyn std::error::Error
                 }
             }
             println!("{}", post.content());
-            Ok(post.clone())
+            Ok(post.to_meme())
         },
         Err(e) => {
             info!("ERROR! {}", e);
